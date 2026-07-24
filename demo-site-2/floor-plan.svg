@@ -1,0 +1,18 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 600 220" width="600" height="220">
+  <rect width="600" height="220" fill="#faf6f1"/>
+  <g font-family="sans-serif" font-size="13" fill="#2b2420">
+    <rect x="20" y="30" width="160" height="160" rx="6" fill="#e9c9b6" stroke="#b5654a"/>
+    <text x="100" y="115" text-anchor="middle">Quiet Zone</text>
+
+    <rect x="200" y="30" width="160" height="75" rx="6" fill="#c9d9c4" stroke="#6f8f63"/>
+    <text x="280" y="72" text-anchor="middle">Collab Zone</text>
+
+    <rect x="200" y="115" width="160" height="75" rx="6" fill="#c9d3e0" stroke="#5f76a0"/>
+    <text x="280" y="145" text-anchor="middle">Phone Booths</text>
+    <text x="280" y="162" text-anchor="middle" font-size="11">(4 rooms)</text>
+
+    <rect x="380" y="30" width="200" height="160" rx="6" fill="#e8dcc0" stroke="#a68c4a"/>
+    <text x="480" y="105" text-anchor="middle">Cafe Corner</text>
+    <text x="480" y="122" text-anchor="middle" font-size="11">coffee + snacks</text>
+  </g>
+</svg>

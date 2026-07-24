@@ -1,0 +1,93 @@
+:root {
+  --clay: #b5654a;
+  --ink: #2b2420;
+  --paper: #faf6f1;
+}
+
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  font-family: -apple-system, "Segoe UI", Roboto, sans-serif;
+  background: var(--paper);
+  color: var(--ink);
+  line-height: 1.5;
+}
+
+.site-header {
+  padding: 3rem 2rem 2rem;
+  border-bottom: 1px solid #e4dcd2;
+}
+
+.site-header h1 {
+  margin: 0 0 0.4rem;
+  font-size: 2rem;
+}
+
+.tagline {
+  margin: 0;
+  color: #6b6259;
+}
+
+main {
+  max-width: 640px;
+  margin: 0 auto;
+  padding: 2rem;
+}
+
+.section {
+  margin-bottom: 3rem;
+}
+
+.section h2 {
+  font-size: 1.25rem;
+  margin-bottom: 0.75rem;
+}
+
+.section img {
+  max-width: 100%;
+  height: auto;
+  border-radius: 4px;
+  margin-bottom: 0.75rem;
+}
+
+.cta-button {
+  background: #ffffff;
+  color: var(--ink); /* the Reserve a Seat button overrides this inline — see index.html */
+  border: 1px solid #cfc7bd;
+  padding: 0.75rem 1.5rem;
+  font-size: 1rem;
+  border-radius: 4px;
+  cursor: pointer;
+}
+
+form {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+}
+
+.field-hint {
+  margin: 0.6rem 0 0.2rem;
+  font-size: 0.85rem;
+  color: #6b6259;
+}
+
+form input {
+  padding: 0.6rem;
+  border: 1px solid #cfc7bd;
+  border-radius: 4px;
+  font-size: 1rem;
+}
+
+.submit-button {
+  margin-top: 1.2rem;
+  align-self: flex-start;
+}
+
+.site-footer {
+  padding: 2rem;
+  text-align: center;
+  color: #797065;
+  font-size: 0.85rem;
+}

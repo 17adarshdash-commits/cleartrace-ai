@@ -62,6 +62,9 @@
   button.running {
     background: var(--card); color: var(--dim); border: 1px solid var(--border);
   }
+  #viewPage:hover:not(:disabled) {
+    background: var(--card-hover); border-color: var(--clay); box-shadow: none;
+  }
 
   .summary { display: none; gap: 1rem; margin-bottom: 1.75rem; }
   .metric {
@@ -156,6 +159,12 @@
     <div class="metric after"><div class="n" id="afterCount">–</div><div class="l">Issues remaining</div></div>
   </div>
 
+  <div id="viewPageRow" style="display:none; margin-bottom: 1.75rem;">
+    <button id="viewPage" style="width: 100%; background: var(--card); color: var(--clay); border: 1px solid var(--border);">
+      View the fixed page ↗
+    </button>
+  </div>
+
   <section id="issuesSection" style="display:none">
     <h2>What was wrong with the page</h2>
     <div id="issuesList"></div>
@@ -230,6 +239,7 @@ document.getElementById("run").addEventListener("click", async () => {
   document.getElementById("issuesSection").style.display = "none";
   document.getElementById("logSection").style.display = "none";
   document.getElementById("summary").style.display = "none";
+  document.getElementById("viewPageRow").style.display = "none";
 
   try {
     const res = await fetch(`${BACKEND}/audit`, {
@@ -244,6 +254,13 @@ document.getElementById("run").addEventListener("click", async () => {
     document.getElementById("summary").style.display = "flex";
     document.getElementById("beforeCount").textContent = data.before.length;
     document.getElementById("afterCount").textContent = data.after.length;
+
+    const pageUrl = document.getElementById("url").value;
+    document.getElementById("viewPageRow").style.display = "block";
+    document.getElementById("viewPage").onclick = () => {
+      const bustCache = pageUrl + (pageUrl.includes("?") ? "&" : "?") + "_t=" + Date.now();
+      window.open(bustCache, "_blank");
+    };
   } catch (e) {
     empty.style.display = "block";
     empty.innerHTML = `<div class="error-box">Couldn't reach the agent. Is the backend running? (${e.message})</div>`;

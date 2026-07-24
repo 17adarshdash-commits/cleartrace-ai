@@ -47,16 +47,35 @@ app.add_middleware(
 DEMO_SITE_DIR = Path(__file__).parent.parent / "demo-site"
 WORKING_COPY = Path(__file__).parent.parent / "demo-site-working"
 
+# Maps a port in the requested URL to the (source, working-copy) directory pair
+# to patch. Add an entry here for every demo site you stand up on a new port —
+# this is what was missing when a second site got added without updating this file.
+SITE_DIRS_BY_PORT = {
+    "8080": (Path(__file__).parent.parent / "demo-site", Path(__file__).parent.parent / "demo-site-working"),
+    "8081": (Path(__file__).parent.parent / "demo-site-2", Path(__file__).parent.parent / "demo-site-2-working"),
+}
+
+
+def _dirs_for_url(url: str):
+    from urllib.parse import urlparse
+    port = str(urlparse(url).port or "8080")
+    if port not in SITE_DIRS_BY_PORT:
+        raise ValueError(
+            f"No demo site directory configured for port {port}. "
+            f"Add an entry to SITE_DIRS_BY_PORT in main.py."
+        )
+    return SITE_DIRS_BY_PORT[port]
+
 
 class AuditRequest(BaseModel):
     url: str = "http://localhost:8080/index.html"
     html_filename: str = "index.html"
 
 
-def _reset_working_copy():
-    if WORKING_COPY.exists():
-        shutil.rmtree(WORKING_COPY)
-    shutil.copytree(DEMO_SITE_DIR, WORKING_COPY)
+def _reset_working_copy(source_dir: Path, working_dir: Path):
+    if working_dir.exists():
+        shutil.rmtree(working_dir)
+    shutil.copytree(source_dir, working_dir)
 
 
 def _log(steps: list, **kwargs):
@@ -72,8 +91,9 @@ def audit(req: AuditRequest):
       - steps: an ordered log of every plan/act/verify/retry action taken
     """
     steps: list = []
-    _reset_working_copy()
-    html_path = WORKING_COPY / req.html_filename
+    source_dir, working_dir = _dirs_for_url(req.url)
+    _reset_working_copy(source_dir, working_dir)
+    html_path = working_dir / req.html_filename
 
     before = run_audit(req.url)
     _log(steps, type="scan", phase="before", violation_count=len(before))
@@ -85,11 +105,11 @@ def audit(req: AuditRequest):
                 continue
 
             if violation["id"] == "image-alt":
-                _fix_alt_text_violation(steps, html_path, selector, violation, node)
+                _fix_alt_text_violation(steps, html_path, selector, violation, node, page_url=req.url)
             elif violation["id"] == "color-contrast":
                 _fix_contrast_violation(steps, html_path, selector, node)
             elif violation["id"] in ("label", "aria-input-field-name"):
-                _fix_label_violation(steps, html_path, selector, violation, node)
+                _fix_label_violation(steps, html_path, selector, violation, node, page_url=req.url)
             else:
                 _log(steps, type="skip", selector=selector, reason=f"no fix strategy for rule '{violation['id']}'")
 
@@ -177,7 +197,7 @@ def _fix_contrast_via_stylesheet(steps, html_path, selector, element):
     )
 
 
-def _fix_alt_text_violation(steps, html_path, selector, violation, node, attempt=1, history=None):
+def _fix_alt_text_violation(steps, html_path, selector, violation, node, page_url, attempt=1, history=None):
     history = history or []
     soup = load(str(html_path))
     element = soup.select_one(selector)
@@ -214,16 +234,16 @@ def _fix_alt_text_violation(steps, html_path, selector, violation, node, attempt
         selector=selector, value=result["value"], reasoning=result.get("reasoning"),
     )
 
-    still_failing = _revalidate(selector, "image-alt")
+    still_failing = _revalidate(page_url, selector, "image-alt")
     if still_failing and attempt < MAX_RETRIES:
         history.append(f"Attempt {attempt}: set alt=\"{result['value']}\" — still flagged.")
         _log(steps, type="retry", selector=selector, attempt=attempt + 1)
-        _fix_alt_text_violation(steps, html_path, selector, violation, node, attempt + 1, history)
+        _fix_alt_text_violation(steps, html_path, selector, violation, node, page_url, attempt + 1, history)
     elif still_failing:
         _log(steps, type="flagged_for_review", selector=selector, reason=f"exceeded {MAX_RETRIES} attempts")
 
 
-def _fix_label_violation(steps, html_path, selector, violation, node, attempt=1, history=None):
+def _fix_label_violation(steps, html_path, selector, violation, node, page_url, attempt=1, history=None):
     history = history or []
     soup = load(str(html_path))
     element = soup.select_one(selector)
@@ -246,24 +266,24 @@ def _fix_label_violation(steps, html_path, selector, violation, node, attempt=1,
         selector=selector, value=result["value"], reasoning=result.get("reasoning"),
     )
 
-    still_failing = _revalidate(selector, violation["id"])
+    still_failing = _revalidate(page_url, selector, violation["id"])
     if still_failing and attempt < MAX_RETRIES:
         history.append(f"Attempt {attempt}: set aria-label=\"{result['value']}\" — still flagged.")
         _log(steps, type="retry", selector=selector, attempt=attempt + 1)
-        _fix_label_violation(steps, html_path, selector, violation, node, attempt + 1, history)
+        _fix_label_violation(steps, html_path, selector, violation, node, page_url, attempt + 1, history)
     elif still_failing:
         _log(steps, type="flagged_for_review", selector=selector, reason=f"exceeded {MAX_RETRIES} attempts")
 
 
-def _revalidate(selector: str, rule_id: str) -> bool:
+def _revalidate(page_url: str, selector: str, rule_id: str) -> bool:
     """
-    Re-runs the full audit and checks whether a violation with this
+    Re-runs the full audit against the SAME url this request targeted
+    (not a hardcoded default) and checks whether a violation with this
     rule_id still targets this selector. This is the actual verify
     step — it re-reads the live served page, it does not just trust
     that the patch was applied.
     """
-    port = os.environ.get("DEMO_SITE_PORT", "8080")
-    results = run_audit(f"http://localhost:{port}/index.html")
+    results = run_audit(page_url)
     for v in results:
         if v["id"] != rule_id:
             continue
