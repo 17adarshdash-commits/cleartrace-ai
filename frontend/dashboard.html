@@ -257,9 +257,29 @@ document.getElementById("run").addEventListener("click", async () => {
 
     const pageUrl = document.getElementById("url").value;
     document.getElementById("viewPageRow").style.display = "block";
-    document.getElementById("viewPage").onclick = () => {
-      const bustCache = pageUrl + (pageUrl.includes("?") ? "&" : "?") + "_t=" + Date.now();
-      window.open(bustCache, "_blank");
+    document.getElementById("viewPage").onclick = async () => {
+      const el = document.getElementById("viewPage");
+      const original = el.textContent;
+      el.textContent = "Loading…";
+      try {
+        // cache: 'no-store' forces a real network request every time —
+        // this is not a query-string trick, it's an explicit instruction
+        // to bypass HTTP caching entirely, so it cannot show a stale copy.
+        const pageRes = await fetch(pageUrl, { cache: "no-store" });
+        let html = await pageRes.text();
+        // Relative paths (style.css, images) need a <base> tag to resolve
+        // correctly once this HTML is detached into a blob URL — without
+        // this the page would load but look broken (no styling, no images).
+        const baseHref = pageUrl.substring(0, pageUrl.lastIndexOf("/") + 1);
+        html = html.replace(/<head>/i, `<head><base href="${baseHref}">`);
+        const blob = new Blob([html], { type: "text/html" });
+        const blobUrl = URL.createObjectURL(blob);
+        window.open(blobUrl, "_blank");
+      } catch (e) {
+        alert(`Couldn't load the page directly: ${e.message}`);
+      } finally {
+        el.textContent = original;
+      }
     };
   } catch (e) {
     empty.style.display = "block";
