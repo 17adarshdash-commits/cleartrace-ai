@@ -21,6 +21,8 @@ make the live demo noticeably stronger — but get the loop correct
 and honest first.
 """
 
+import base64
+import mimetypes
 import os
 import shutil
 from pathlib import Path
@@ -135,8 +137,21 @@ def _fix_alt_text_violation(steps, html_path, selector, violation, node, attempt
     image_url = element.get("src", "")
     surrounding = str(element.parent) if element.parent else str(element)
 
+    image_base64, image_mime = None, "image/svg+xml"
+    if image_url:
+        image_path = html_path.parent / image_url
+        if image_path.exists():
+            image_bytes = image_path.read_bytes()
+            image_base64 = base64.b64encode(image_bytes).decode("ascii")
+            guessed_mime, _ = mimetypes.guess_type(str(image_path))
+            image_mime = guessed_mime or "image/svg+xml"
+        else:
+            _log(steps, type="warning", selector=selector,
+                 reason=f"image file not found on disk at {image_path}, model will not see actual image content")
+
     try:
-        result = fix_alt_text(image_url, surrounding, violation["description"], attempt_history=history)
+        result = fix_alt_text(image_url, surrounding, violation["description"], attempt_history=history,
+                               image_base64=image_base64, image_mime=image_mime)
     except RuntimeError as e:
         _log(steps, type="fix_error", selector=selector, error=str(e))
         return

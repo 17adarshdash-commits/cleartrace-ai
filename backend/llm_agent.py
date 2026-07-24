@@ -37,11 +37,13 @@ MAX_RETRIES = 3
 
 
 ALT_TEXT_SYSTEM_PROMPT = """You are an accessibility engineer fixing a specific WCAG violation \
-on a real webpage. You will be shown the image itself (if provided as a URL/description), the \
-surrounding HTML context, and the axe-core violation detail. Decide the correct fix and respond \
-with ONLY a JSON object, no prose outside it, shaped exactly like:
+on a real webpage. You will be shown the actual image, plus the surrounding HTML context and the \
+axe-core violation detail. Decide the correct fix and respond with ONLY a JSON object, no prose \
+outside it, shaped exactly like:
 {"attribute": "alt", "value": "<the alt text you wrote>", "reasoning": "<your brief reasoning, 1-2 sentences>"}
-Alt text must describe the image's actual informational content, not a generic placeholder."""
+Alt text must describe the image's actual informational content, not a generic placeholder. If the \
+image shows a sequence of steps or stages, name each distinct step/stage individually — do not \
+just say "a multi-step process" or summarize only the first and last steps."""
 
 LABEL_SYSTEM_PROMPT = """You are an accessibility engineer fixing a missing form label. You will \
 be given the input element's HTML and its surrounding DOM context (headings, hint text, sibling \
@@ -50,25 +52,33 @@ Respond with ONLY a JSON object, shaped exactly like:
 {"attribute": "aria-label", "value": "<label text>", "reasoning": "<your brief reasoning, 1-2 sentences>"}"""
 
 
-def _call_model(system_prompt: str, user_content: str) -> dict:
+def _call_model(system_prompt: str, user_content: str, image_base64: str | None = None,
+                 image_mime: str = "image/svg+xml") -> dict:
     if not MODEL_API_KEY:
         raise RuntimeError(
             "MODEL_API_KEY is not set. Set it in your .env before running a real audit — "
             "see backend/.env.example."
         )
-    # Deliberately NOT using a "text.format" structured-output parameter here —
-    # that syntax is a Chat Completions habit and the Responses API's version of
-    # it is stricter/different (often requires a full json_schema block), which
-    # was the actual cause of the 400 you hit. Simpler and more robust: ask for
-    # JSON in the prompt itself and parse leniently below.
     full_prompt = (
         f"{system_prompt}\n\nRespond with ONLY the JSON object described above — "
         f"no markdown code fences, no prose before or after it.\n\n{user_content}"
     )
-    payload = {
-        "model": MODEL_NAME,
-        "input": full_prompt,
-    }
+
+    if image_base64:
+        # Multimodal input: text + the actual image, not just its filename/URL as text.
+        input_content = [
+            {
+                "role": "user",
+                "content": [
+                    {"type": "input_text", "text": full_prompt},
+                    {"type": "input_image", "image_url": f"data:{image_mime};base64,{image_base64}"},
+                ],
+            }
+        ]
+        payload = {"model": MODEL_NAME, "input": input_content}
+    else:
+        payload = {"model": MODEL_NAME, "input": full_prompt}
+
     headers = {"Authorization": f"Bearer {MODEL_API_KEY}", "Content-Type": "application/json"}
     resp = httpx.post(MODEL_API_URL, json=payload, headers=headers, timeout=30)
     if resp.status_code >= 400:
@@ -111,11 +121,13 @@ def _extract_json(raw_text: str) -> dict:
 
 
 def fix_alt_text(image_url: str, surrounding_html: str, violation_detail: str,
-                  attempt_history: list[str] | None = None) -> dict:
-    context = f"Image URL: {image_url}\nSurrounding HTML:\n{surrounding_html}\nViolation: {violation_detail}"
+                  attempt_history: list[str] | None = None,
+                  image_base64: str | None = None, image_mime: str = "image/svg+xml") -> dict:
+    context = f"Image filename (for reference only, do not rely on this for content): {image_url}\n" \
+              f"Surrounding HTML:\n{surrounding_html}\nViolation: {violation_detail}"
     if attempt_history:
         context += "\n\nPrevious attempts that still failed re-scan:\n" + "\n".join(attempt_history)
-    return _call_model(ALT_TEXT_SYSTEM_PROMPT, context)
+    return _call_model(ALT_TEXT_SYSTEM_PROMPT, context, image_base64=image_base64, image_mime=image_mime)
 
 
 def fix_form_label(field_html: str, surrounding_html: str, violation_detail: str,
