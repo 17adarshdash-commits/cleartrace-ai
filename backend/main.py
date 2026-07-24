@@ -34,7 +34,7 @@ from pydantic import BaseModel
 from auditor import run_audit
 from contrast import fix_contrast, extract_hex_colors
 from llm_agent import fix_alt_text, fix_form_label, MAX_RETRIES
-from patcher import load, save, patch_attribute, patch_inline_style_color
+from patcher import load, save, patch_attribute, patch_inline_style_color, patch_css_color
 
 app = FastAPI(title="Accessibility Self-Auditing Agent")
 app.add_middleware(
@@ -110,7 +110,7 @@ def _fix_contrast_violation(steps, html_path, selector, node):
     style = element.get("style", "")
     colors = extract_hex_colors(style)
     if not colors:
-        _log(steps, type="fix_failed", selector=selector, reason="no inline color found to fix")
+        _fix_contrast_via_stylesheet(steps, html_path, selector, element)
         return
 
     fg = colors[0]
@@ -122,6 +122,57 @@ def _fix_contrast_violation(steps, html_path, selector, node):
     _log(
         steps, type="fix_applied", strategy="deterministic", rule="color-contrast",
         selector=selector, from_hex=fg, to_hex=result["new_hex"],
+        original_ratio=round(result["original_ratio"], 2), new_ratio=round(result["new_ratio"], 2),
+    )
+
+
+def _fix_contrast_via_stylesheet(steps, html_path, selector, element):
+    """
+    Fallback for the one known case where color lives in the external
+    stylesheet rather than inline: matches the element's class against
+    a CSS rule and patches that instead. Bounded to this project's own
+    single, known stylesheet — see patcher.patch_css_color for why this
+    isn't a general solution.
+    """
+    css_path = html_path.parent / "style.css"
+    if not css_path.exists():
+        _log(steps, type="fix_failed", selector=selector, reason="no inline color and no style.css found")
+        return
+
+    classes = element.get("class", [])
+    target_el = element
+    if not classes and element.parent is not None:
+        classes = element.parent.get("class", [])
+        target_el = element.parent
+    if not classes:
+        _log(steps, type="fix_failed", selector=selector, reason="no inline color and no CSS class to target")
+        return
+
+    css_selector = "." + classes[0]
+    css_text = css_path.read_text(encoding="utf-8")
+    import re
+    match = re.search(re.escape(css_selector) + r"\s*\{([^}]*)\}", css_text, re.DOTALL)
+    if not match or "color:" not in match.group(1):
+        _log(steps, type="fix_failed", selector=selector,
+             reason=f"no color declaration found on {css_selector} in style.css")
+        return
+
+    current_hex = extract_hex_colors(match.group(1))
+    if not current_hex:
+        _log(steps, type="fix_failed", selector=selector, reason=f"could not parse color on {css_selector}")
+        return
+
+    fg = current_hex[0]
+    bg = "#faf6f1"  # the demo site's page background — known, not resolved generically
+    result = fix_contrast(fg, bg)
+    patched = patch_css_color(str(css_path), css_selector, result["new_hex"])
+    if not patched:
+        _log(steps, type="fix_failed", selector=selector, reason=f"failed to write patch to {css_selector}")
+        return
+
+    _log(
+        steps, type="fix_applied", strategy="deterministic", rule="color-contrast", via="stylesheet",
+        selector=selector, css_selector=css_selector, from_hex=fg, to_hex=result["new_hex"],
         original_ratio=round(result["original_ratio"], 2), new_ratio=round(result["new_ratio"], 2),
     )
 

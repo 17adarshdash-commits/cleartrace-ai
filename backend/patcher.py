@@ -30,6 +30,39 @@ def save(soup: BeautifulSoup, html_path: str) -> None:
         f.write(str(soup))
 
 
+def patch_css_color(css_path: str, selector: str, new_hex: str) -> bool:
+    """
+    Handles the one case the HTML-AST patcher above can't reach: a color
+    declaration living in an external stylesheet rather than an inline
+    style attribute. This uses a plain string/regex replacement rather
+    than a proper CSS parser — that's a deliberate, bounded exception to
+    the "no regex on markup" rule elsewhere in this project, justified
+    only because this is a single small stylesheet we authored ourselves,
+    not arbitrary third-party CSS. Don't reuse this pattern against a
+    real site's stylesheet without a real CSS parser.
+    """
+    import re
+    with open(css_path, "r", encoding="utf-8") as f:
+        css = f.read()
+
+    # Find the selector's rule block, then replace its color property.
+    pattern = re.compile(re.escape(selector) + r"\s*\{([^}]*)\}", re.DOTALL)
+    match = pattern.search(css)
+    if not match:
+        return False
+
+    block = match.group(1)
+    if "color:" not in block:
+        return False
+
+    new_block = re.sub(r"color:\s*#[0-9a-fA-F]{3,6}\s*;", f"color: {new_hex};", block)
+    new_css = css[:match.start(1)] + new_block + css[match.end(1):]
+
+    with open(css_path, "w", encoding="utf-8") as f:
+        f.write(new_css)
+    return True
+
+
 def patch_attribute(soup: BeautifulSoup, css_selector: str, attribute: str, value: str) -> bool:
     """
     Finds the element via CSS selector (axe-core gives us these as the

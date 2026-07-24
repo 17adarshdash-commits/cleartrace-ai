@@ -2,81 +2,234 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<title>Accessibility Agent — Run Log</title>
+<title>Accessibility Self-Auditing Agent</title>
 <style>
   :root {
-    --bg: #16130f;
-    --panel: #1f1b15;
-    --ink: #ece5d8;
-    --dim: #8c8272;
-    --clay: #c98255;
-    --ok: #7fa876;
-    --warn: #d9a441;
+    --bg: #121110;
+    --card: #1c1a17;
+    --card-hover: #221f1b;
+    --border: #322e28;
+    --border-hover: #453f36;
+    --ink: #f0ece3;
+    --dim: #a39a8a;
+    --dim-2: #746c5f;
+    --clay: #e08a52;
+    --clay-hover: #ec9d68;
+    --clay-light: rgba(224, 138, 82, 0.14);
+    --clay-text: #f0a978;
+    --ok: #6fbf7f;
+    --ok-light: rgba(111, 191, 127, 0.12);
+    --bad: #e2716f;
+    --bad-light: rgba(226, 113, 111, 0.12);
   }
   * { box-sizing: border-box; }
   body {
     margin: 0;
     background: var(--bg);
     color: var(--ink);
-    font-family: "SF Mono", "Menlo", monospace;
-    padding: 2rem;
+    font-family: -apple-system, "Segoe UI", Roboto, sans-serif;
+    padding: 2.5rem 2rem;
+    line-height: 1.55;
   }
-  h1 { font-size: 1.1rem; font-weight: 600; margin: 0 0 0.25rem; }
-  .sub { color: var(--dim); font-size: 0.85rem; margin: 0 0 1.5rem; }
-  .controls { display: flex; gap: 0.6rem; margin-bottom: 1.5rem; }
+  .wrap { max-width: 880px; margin: 0 auto; }
+  h1 {
+    font-size: 1.45rem; font-weight: 600; margin: 0 0 0.3rem;
+    background: linear-gradient(90deg, var(--ink), var(--dim));
+    -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent;
+  }
+  .sub { color: var(--dim); font-size: 0.92rem; margin: 0 0 1.75rem; }
+
+  .controls { display: flex; gap: 0.6rem; margin-bottom: 2rem; }
   input[type=text] {
-    flex: 1; background: var(--panel); border: 1px solid #332c22; color: var(--ink);
-    padding: 0.6rem 0.8rem; border-radius: 4px; font-family: inherit; font-size: 0.9rem;
+    flex: 1; background: var(--card); border: 1px solid var(--border); color: var(--ink);
+    padding: 0.75rem 1rem; border-radius: 10px; font-family: inherit; font-size: 0.92rem;
+    transition: border-color 0.15s ease, background 0.15s ease;
+  }
+  input[type=text]:focus {
+    outline: none; border-color: var(--clay); background: var(--card-hover);
   }
   button {
-    background: var(--clay); color: #1a1510; border: none; padding: 0.6rem 1.2rem;
-    border-radius: 4px; font-family: inherit; font-weight: 600; cursor: pointer;
+    background: var(--clay); color: #1a1310; border: none; padding: 0.75rem 1.5rem;
+    border-radius: 10px; font-family: inherit; font-weight: 600; font-size: 0.92rem; cursor: pointer;
+    transition: background 0.15s ease, transform 0.08s ease, box-shadow 0.15s ease;
+    box-shadow: 0 0 0 0 rgba(224, 138, 82, 0);
   }
+  button:hover:not(:disabled) {
+    background: var(--clay-hover); box-shadow: 0 4px 16px rgba(224, 138, 82, 0.25);
+  }
+  button:active:not(:disabled) { transform: scale(0.97); }
   button:disabled { opacity: 0.5; cursor: default; }
-  .summary { display: flex; gap: 1.5rem; margin-bottom: 1.5rem; }
-  .count { background: var(--panel); border: 1px solid #332c22; border-radius: 6px; padding: 0.8rem 1.2rem; }
-  .count .n { font-size: 1.6rem; font-weight: 700; }
-  .count .l { font-size: 0.75rem; color: var(--dim); text-transform: uppercase; letter-spacing: 0.05em; }
-  .log { background: var(--panel); border: 1px solid #332c22; border-radius: 6px; padding: 1rem; }
-  .step { padding: 0.55rem 0; border-bottom: 1px solid #2a241b; font-size: 0.85rem; }
-  .step:last-child { border-bottom: none; }
-  .tag { display: inline-block; padding: 0.1rem 0.5rem; border-radius: 3px; font-size: 0.7rem; margin-right: 0.6rem; text-transform: uppercase; letter-spacing: 0.03em; }
-  .tag.scan { background: #2a3d2a; color: var(--ok); }
-  .tag.fix_applied { background: #3a2f1c; color: var(--clay); }
-  .tag.retry { background: #3d321a; color: var(--warn); }
-  .tag.flagged_for_review { background: #402424; color: #d97a7a; }
-  .tag.fix_failed, .tag.fix_error { background: #402424; color: #d97a7a; }
-  .tag.skip { background: #2a2a2a; color: var(--dim); }
-  .reasoning { color: var(--dim); margin-top: 0.25rem; padding-left: 3.2rem; font-style: italic; }
-  .selector { color: #b5a88f; }
+  button.running {
+    background: var(--card); color: var(--dim); border: 1px solid var(--border);
+  }
+
+  .summary { display: none; gap: 1rem; margin-bottom: 1.75rem; }
+  .metric {
+    flex: 1; background: var(--card); border: 1px solid var(--border); border-radius: 14px;
+    padding: 1.1rem 1.25rem; text-align: center; transition: border-color 0.2s ease, transform 0.2s ease;
+  }
+  .metric:hover { border-color: var(--border-hover); transform: translateY(-2px); }
+  .metric .n { font-size: 2rem; font-weight: 700; }
+  .metric .l { font-size: 0.78rem; color: var(--dim); text-transform: uppercase; letter-spacing: 0.05em; margin-top: 0.2rem; }
+  .metric.before .n { color: var(--bad); }
+  .metric.after .n { color: var(--ok); }
+
+  section { margin-bottom: 2rem; }
+  section > h2 { font-size: 1.05rem; font-weight: 600; margin: 0 0 0.9rem; color: var(--ink); }
+
+  .issue-card {
+    background: var(--card); border: 1px solid var(--border); border-radius: 14px;
+    padding: 1.15rem 1.3rem; margin-bottom: 0.7rem; display: flex; gap: 1rem; align-items: flex-start;
+    transition: border-color 0.15s ease, transform 0.15s ease, background 0.15s ease;
+  }
+  .issue-card:hover { border-color: var(--border-hover); background: var(--card-hover); transform: translateX(3px); }
+  .issue-icon {
+    width: 36px; height: 36px; border-radius: 10px; background: var(--clay-light); color: var(--clay-text);
+    display: flex; align-items: center; justify-content: center; flex-shrink: 0; font-size: 1.1rem; font-weight: 700;
+  }
+  .issue-body { flex: 1; }
+  .issue-title { font-weight: 600; font-size: 0.98rem; margin-bottom: 0.25rem; color: var(--ink); }
+  .issue-plain { font-size: 0.9rem; color: var(--ink); opacity: 0.9; margin-bottom: 0.4rem; }
+  .issue-why { font-size: 0.83rem; color: var(--dim); }
+  .issue-count {
+    font-size: 0.75rem; background: var(--bad-light); color: var(--bad); padding: 0.2rem 0.6rem;
+    border-radius: 100px; font-weight: 600; flex-shrink: 0; white-space: nowrap;
+  }
+
+  .log-item {
+    background: var(--card); border: 1px solid var(--border); border-radius: 14px;
+    padding: 0.95rem 1.2rem; margin-bottom: 0.55rem; transition: border-color 0.15s ease, background 0.15s ease;
+  }
+  .log-item:hover { border-color: var(--border-hover); background: var(--card-hover); }
+  .log-plain { font-size: 0.92rem; display: flex; align-items: center; gap: 0.65rem; }
+  .status-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+  .status-dot.ok { background: var(--ok); box-shadow: 0 0 8px rgba(111, 191, 127, 0.5); }
+  .status-dot.bad { background: var(--bad); box-shadow: 0 0 8px rgba(226, 113, 111, 0.5); }
+  .status-dot.info { background: var(--dim-2); }
+  .log-reasoning {
+    font-size: 0.83rem; color: var(--dim); font-style: italic; margin: 0.45rem 0 0 1.3rem;
+  }
+  .log-technical {
+    font-size: 0.76rem; color: var(--dim); margin: 0 0 0 1.3rem; font-family: "SF Mono", Menlo, monospace;
+    background: var(--bg); padding: 0 0.6rem; border-radius: 8px; white-space: pre-wrap;
+    max-height: 0; overflow: hidden; opacity: 0; transition: max-height 0.25s ease, padding 0.25s ease, opacity 0.2s ease;
+  }
+  .log-item.expanded .log-technical { max-height: 400px; padding: 0.5rem 0.6rem; opacity: 1; margin-top: 0.45rem; }
+  .toggle-tech {
+    font-size: 0.76rem; color: var(--clay); cursor: pointer; margin: 0.4rem 0 0 1.3rem; display: inline-flex;
+    align-items: center; gap: 0.3rem; user-select: none; transition: color 0.15s ease;
+  }
+  .toggle-tech:hover { color: var(--clay-hover); }
+  .toggle-tech .chev { transition: transform 0.2s ease; display: inline-block; font-size: 0.7rem; }
+  .log-item.expanded .toggle-tech .chev { transform: rotate(90deg); }
+
+  .empty { color: var(--dim); font-size: 0.9rem; text-align: center; padding: 2.5rem 0; }
+  .error-box {
+    background: var(--bad-light); color: var(--bad); border: 1px solid rgba(226, 113, 111, 0.3);
+    border-radius: 12px; padding: 0.95rem 1.15rem; font-size: 0.9rem;
+  }
+
+  .spinner {
+    display: inline-block; width: 14px; height: 14px; border-radius: 50%;
+    border: 2px solid var(--dim-2); border-top-color: var(--clay);
+    animation: spin 0.7s linear infinite; margin-right: 0.5rem; vertical-align: -2px;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  section, .summary { animation: fadeIn 0.35s ease; }
+  @keyframes fadeIn { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: translateY(0); } }
 </style>
 </head>
 <body>
+<div class="wrap">
 
-<h1>Accessibility Self-Auditing Agent</h1>
-<p class="sub">Runs a scan → fix → re-scan → retry cycle against the demo site and shows every real step taken.</p>
+  <h1>Accessibility self-auditing agent</h1>
+  <p class="sub">Scans a page for accessibility problems, fixes what it can, then checks its own work.</p>
 
-<div class="controls">
-  <input type="text" id="url" value="http://localhost:8080/index.html">
-  <button id="run">Run Audit</button>
+  <div class="controls">
+    <input type="text" id="url" value="http://localhost:8080/index.html">
+    <button id="run">Run audit</button>
+  </div>
+
+  <div class="summary" id="summary">
+    <div class="metric before"><div class="n" id="beforeCount">–</div><div class="l">Issues found</div></div>
+    <div class="metric after"><div class="n" id="afterCount">–</div><div class="l">Issues remaining</div></div>
+  </div>
+
+  <section id="issuesSection" style="display:none">
+    <h2>What was wrong with the page</h2>
+    <div id="issuesList"></div>
+  </section>
+
+  <section id="logSection" style="display:none">
+    <h2>What the agent did about it</h2>
+    <div id="logList"></div>
+  </section>
+
+  <div class="empty" id="empty">Click "Run audit" to scan the page.</div>
+
 </div>
-
-<div class="summary" id="summary" style="display:none">
-  <div class="count"><div class="n" id="beforeCount">–</div><div class="l">violations before</div></div>
-  <div class="count"><div class="n" id="afterCount">–</div><div class="l">violations after</div></div>
-</div>
-
-<div class="log" id="log"><div class="step" style="color:var(--dim)">No run yet.</div></div>
 
 <script>
 const BACKEND = "http://localhost:8000";
 
+const RULE_INFO = {
+  "image-alt": {
+    title: "An image has no description",
+    icon: "🖼",
+    plain: "A picture on the page has no written description attached to it.",
+    why: "People who use screen readers (software that reads a webpage aloud, often used by people who are blind or have low vision) hear nothing where this image is — they have no idea what it shows.",
+  },
+  "color-contrast": {
+    title: "Text is too hard to read",
+    icon: "◐",
+    plain: "Some text is too close in color to its background, making it low-contrast.",
+    why: "People with low vision, color blindness, or anyone using their phone in bright sunlight can struggle to read text that doesn't stand out clearly from its background.",
+  },
+  "label": {
+    title: "A form field isn't labeled",
+    icon: "▭",
+    plain: "A box where someone types information (like a name or phone number) has no label telling them what to enter.",
+    why: "Sighted users can usually guess from layout, but screen reader users hear only \"edit text\" with no indication of what's being asked for — they can't fill out the form correctly.",
+  },
+  "aria-input-field-name": {
+    title: "A form field isn't labeled",
+    icon: "▭",
+    plain: "A box where someone types information has no accessible name for assistive technology.",
+    why: "Screen reader users hear only \"edit text\" with no indication of what's being asked for — they can't fill out the form correctly.",
+  },
+};
+
+const STEP_INFO = {
+  scan: (s) => ({ text: `Scanned the page — found ${s.violation_count} issue(s).`, status: "info" }),
+  fix_applied: (s) => {
+    if (s.rule === "color-contrast") {
+      return { text: `Fixed low-contrast text by darkening the color (was hard to read, now passes the readability standard).`, status: "ok" };
+    }
+    if (s.rule === "image-alt") {
+      return { text: `Wrote a description for the image so screen readers can announce what it shows.`, status: "ok" };
+    }
+    return { text: `Added a label to a form field so it's clear what information belongs there.`, status: "ok" };
+  },
+  fix_failed: (s) => ({ text: `Couldn't fix this one automatically — it needs a person to look at it. (${s.reason || ""})`, status: "bad" }),
+  fix_error: (s) => ({ text: `A fix attempt hit a technical error and didn't complete.`, status: "bad" }),
+  retry: (s) => ({ text: `First attempt didn't fully fix the issue — trying again with what it learned.`, status: "info" }),
+  flagged_for_review: (s) => ({ text: `Tried multiple times but couldn't resolve this automatically — flagged for a person to review.`, status: "bad" }),
+  skip: (s) => ({ text: `Found an issue type it doesn't know how to fix yet.`, status: "bad" }),
+  warning: (s) => ({ text: `Noted a limitation while working on this fix.`, status: "info" }),
+};
+
 document.getElementById("run").addEventListener("click", async () => {
   const btn = document.getElementById("run");
-  const logEl = document.getElementById("log");
+  const empty = document.getElementById("empty");
   btn.disabled = true;
-  btn.textContent = "Running…";
-  logEl.innerHTML = '<div class="step" style="color:var(--dim)">Scanning…</div>';
+  btn.classList.add("running");
+  btn.innerHTML = `<span class="spinner"></span>Running…`;
+  empty.textContent = "Scanning and fixing — this can take a little while…";
+  empty.style.display = "block";
+  document.getElementById("issuesSection").style.display = "none";
+  document.getElementById("logSection").style.display = "none";
+  document.getElementById("summary").style.display = "none";
 
   try {
     const res = await fetch(`${BACKEND}/audit`, {
@@ -85,42 +238,74 @@ document.getElementById("run").addEventListener("click", async () => {
       body: JSON.stringify({ url: document.getElementById("url").value }),
     });
     const data = await res.json();
-    renderSteps(data.steps);
+    empty.style.display = "none";
+    renderIssues(data.before);
+    renderLog(data.steps);
     document.getElementById("summary").style.display = "flex";
     document.getElementById("beforeCount").textContent = data.before.length;
     document.getElementById("afterCount").textContent = data.after.length;
   } catch (e) {
-    logEl.innerHTML = `<div class="step" style="color:#d97a7a">Run failed: ${e.message}. Is the backend running on :8000?</div>`;
+    empty.style.display = "block";
+    empty.innerHTML = `<div class="error-box">Couldn't reach the agent. Is the backend running? (${e.message})</div>`;
   } finally {
     btn.disabled = false;
-    btn.textContent = "Run Audit";
+    btn.classList.remove("running");
+    btn.textContent = "Run audit";
   }
 });
 
-function renderSteps(steps) {
-  const logEl = document.getElementById("log");
-  logEl.innerHTML = "";
-  for (const s of steps) {
-    const div = document.createElement("div");
-    div.className = "step";
-    let line = `<span class="tag ${s.type}">${s.type.replace(/_/g, " ")}</span>`;
-    if (s.selector) line += `<span class="selector">${s.selector}</span> `;
-    if (s.rule) line += `[${s.rule}] `;
-    if (s.violation_count !== undefined) line += `${s.violation_count} violation(s)`;
-    if (s.from_hex && s.to_hex) line += `${s.from_hex} → ${s.to_hex} (ratio ${s.original_ratio} → ${s.new_ratio})`;
-    if (s.value) line += `→ "${s.value}"`;
-    if (s.attempt) line += ` (attempt ${s.attempt})`;
-    if (s.reason) line += ` — ${s.reason}`;
-    if (s.error) line += ` — ${s.error}`;
-    div.innerHTML = line;
-    if (s.reasoning) {
-      const r = document.createElement("div");
-      r.className = "reasoning";
-      r.textContent = `"${s.reasoning}"`;
-      div.appendChild(r);
-    }
-    logEl.appendChild(div);
+function renderIssues(violations) {
+  const section = document.getElementById("issuesSection");
+  const list = document.getElementById("issuesList");
+  list.innerHTML = "";
+  if (!violations.length) {
+    section.style.display = "none";
+    return;
   }
+  section.style.display = "block";
+  for (const v of violations) {
+    const info = RULE_INFO[v.id] || { title: v.id, icon: "!", plain: v.description || "", why: "" };
+    const count = v.nodes ? v.nodes.length : 1;
+    const card = document.createElement("div");
+    card.className = "issue-card";
+    card.innerHTML = `
+      <div class="issue-icon">${info.icon}</div>
+      <div class="issue-body">
+        <div class="issue-title">${info.title}</div>
+        <div class="issue-plain">${info.plain}</div>
+        <div class="issue-why">${info.why}</div>
+      </div>
+      <div class="issue-count">${count} spot${count > 1 ? "s" : ""}</div>
+    `;
+    list.appendChild(card);
+  }
+}
+
+function renderLog(steps) {
+  const section = document.getElementById("logSection");
+  const list = document.getElementById("logList");
+  list.innerHTML = "";
+  section.style.display = "block";
+  steps.forEach((s, i) => {
+    const builder = STEP_INFO[s.type];
+    const { text, status } = builder ? builder(s) : { text: s.type, status: "info" };
+
+    const item = document.createElement("div");
+    item.className = "log-item";
+    item.innerHTML = `
+      <div class="log-plain"><span class="status-dot ${status}"></span>${text}</div>
+      ${s.reasoning ? `<div class="log-reasoning">"${s.reasoning}"</div>` : ""}
+      <span class="toggle-tech" data-idx="${i}"><span class="chev">▸</span>Technical details</span>
+      <div class="log-technical">${JSON.stringify(s, null, 2)}</div>
+    `;
+    list.appendChild(item);
+  });
+
+  list.querySelectorAll(".toggle-tech").forEach((el) => {
+    el.addEventListener("click", () => {
+      el.closest(".log-item").classList.toggle("expanded");
+    });
+  });
 }
 </script>
 
