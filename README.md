@@ -1,3 +1,13 @@
+## A note on the retry loop
+
+Across many test runs, axe-core's `label` and `image-alt` checks only verify that
+an attribute is present and non-empty — not whether its content is actually good.
+This means a low-confidence or vague fix still passes re-scan on attempt 1, so the
+retry loop rarely fires in practice. We added explicit confidence flagging
+(see the amber "low-confidence" entries in the dashboard log) as our real
+self-review signal instead — the agent tells you when it's guessing, which the
+automated checker structurally cannot detect on its own.
+
 # Accessibility Self-Auditing Agent
 
 Scans a page with axe-core, fixes what it can, re-scans to verify the
