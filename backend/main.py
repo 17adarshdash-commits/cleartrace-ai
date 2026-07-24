@@ -38,7 +38,7 @@ from contrast import fix_contrast, extract_hex_colors
 from llm_agent import fix_alt_text, fix_form_label, MAX_RETRIES
 from patcher import load, save, patch_attribute, patch_inline_style_color, patch_css_color
 
-app = FastAPI(title="Accessibility Self-Auditing Agent")
+app = FastAPI(title="ClearTrace AI")
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
