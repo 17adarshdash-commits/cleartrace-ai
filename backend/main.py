@@ -29,7 +29,9 @@ from pathlib import Path
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import Response
 from pydantic import BaseModel
+import httpx
 
 from auditor import run_audit
 from contrast import fix_contrast, extract_hex_colors
@@ -53,6 +55,7 @@ WORKING_COPY = Path(__file__).parent.parent / "demo-site-working"
 SITE_DIRS_BY_PORT = {
     "8080": (Path(__file__).parent.parent / "demo-site", Path(__file__).parent.parent / "demo-site-working"),
     "8081": (Path(__file__).parent.parent / "demo-site-2", Path(__file__).parent.parent / "demo-site-2-working"),
+    "8082": (Path(__file__).parent.parent / "demo-site-visual", Path(__file__).parent.parent / "demo-site-visual-working"),
 }
 
 
@@ -261,9 +264,11 @@ def _fix_label_violation(steps, html_path, selector, violation, node, page_url, 
 
     patch_attribute(soup, selector, "aria-label", result["value"])
     save(soup, str(html_path))
+    confidence = result.get("confidence", "high")
     _log(
-        steps, type="fix_applied", strategy="agentic", rule=violation["id"], attempt=attempt,
-        selector=selector, value=result["value"], reasoning=result.get("reasoning"),
+        steps, type="fix_applied" if confidence != "low" else "fix_applied_low_confidence",
+        strategy="agentic", rule=violation["id"], attempt=attempt,
+        selector=selector, value=result["value"], reasoning=result.get("reasoning"), confidence=confidence,
     )
 
     still_failing = _revalidate(page_url, selector, violation["id"])
@@ -291,6 +296,20 @@ def _revalidate(page_url: str, selector: str, rule_id: str) -> bool:
             if n["target"] and n["target"][0] == selector:
                 return True
     return False
+
+
+@app.get("/view-page")
+def view_page(url: str):
+    """
+    Proxies a fetch of the demo site's current HTML through the backend.
+    Exists because the dashboard (port 5500) fetching the demo site
+    (port 8080/8081) directly hits a CORS block — the demo site's plain
+    Python static server sends no CORS headers. This endpoint sits on
+    the backend, which already has CORS enabled for the dashboard, and
+    does the actual fetch server-to-server where CORS doesn't apply.
+    """
+    resp = httpx.get(url, timeout=10)
+    return Response(content=resp.content, media_type="text/html")
 
 
 @app.get("/health")

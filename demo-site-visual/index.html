@@ -1,0 +1,38 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Visual Proof Demo</title>
+<style>
+  body { font-family: -apple-system, sans-serif; max-width: 640px; margin: 3rem auto; padding: 0 1.5rem; }
+  .note { background: #fff3cd; border: 1px solid #e0c168; padding: 0.9rem 1.1rem; border-radius: 8px; font-size: 0.9rem; margin-bottom: 2rem; }
+  h2 { font-size: 1.1rem; }
+  button {
+    padding: 0.8rem 1.6rem; font-size: 1rem; border: 1px solid #ccc; border-radius: 6px;
+    background: #fff; cursor: pointer;
+  }
+  img { border: 1px dashed #ccc; }
+</style>
+</head>
+<body>
+
+<div class="note">
+  This page exists purely so you can SEE the agent's fixes with your own eyes —
+  the two issues here were deliberately made dramatic. It's not part of the
+  hackathon submission's demo sites; it's just for your own confidence-check.
+</div>
+
+<h2>1. Nearly-invisible text — watch this get readable</h2>
+<p>Before the fix, try to actually read the button below. It's real text, just contrast that fails badly on purpose.</p>
+<button style="color: #f0f0f0;">Sign Up Now</button>
+
+<h2 style="margin-top: 2.5rem;">2. Broken image — watch the description appear</h2>
+<p>This image file doesn't exist on purpose, so your browser shows a broken-image icon.
+Before the fix, that's ALL you see. After the fix, the agent's alt text appears next
+to the broken icon — because that's literally what alt text is for: browsers show it
+whenever the image itself can't load. This is the one case where you can see alt text
+directly on the page instead of needing a screen reader or dev tools.</p>
+<img src="this-file-does-not-exist.png" width="400" height="180">
+
+</body>
+</html>

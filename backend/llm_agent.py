@@ -49,7 +49,16 @@ LABEL_SYSTEM_PROMPT = """You are an accessibility engineer fixing a missing form
 be given the input element's HTML and its surrounding DOM context (headings, hint text, sibling \
 elements) — the element itself has no name/id hint, so you must deduce its purpose from context. \
 Respond with ONLY a JSON object, shaped exactly like:
-{"attribute": "aria-label", "value": "<label text>", "reasoning": "<your brief reasoning, 1-2 sentences>"}"""
+{"attribute": "aria-label", "value": "<label text>", "reasoning": "<your brief reasoning, 1-2 sentences>", "confidence": "high" or "low"}
+
+The label must be a short, direct name for what the field asks for (e.g. "Full name", "Phone \
+number") — NOT a verbatim copy of the surrounding hint text. If the hint text is itself a full \
+sentence or question, distill it down to the actual piece of information being requested; do not \
+just repeat it back as the label.
+
+Set "confidence" to "low" if the surrounding context is too vague or generic to identify a specific, \
+concrete field name with real certainty — in that case still provide your best guess as the label, \
+but be honest about the low confidence rather than presenting a guess as certain."""
 
 
 def _call_model(system_prompt: str, user_content: str, image_base64: str | None = None,
