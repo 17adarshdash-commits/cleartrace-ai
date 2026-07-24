@@ -1,0 +1,128 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Accessibility Agent — Run Log</title>
+<style>
+  :root {
+    --bg: #16130f;
+    --panel: #1f1b15;
+    --ink: #ece5d8;
+    --dim: #8c8272;
+    --clay: #c98255;
+    --ok: #7fa876;
+    --warn: #d9a441;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--ink);
+    font-family: "SF Mono", "Menlo", monospace;
+    padding: 2rem;
+  }
+  h1 { font-size: 1.1rem; font-weight: 600; margin: 0 0 0.25rem; }
+  .sub { color: var(--dim); font-size: 0.85rem; margin: 0 0 1.5rem; }
+  .controls { display: flex; gap: 0.6rem; margin-bottom: 1.5rem; }
+  input[type=text] {
+    flex: 1; background: var(--panel); border: 1px solid #332c22; color: var(--ink);
+    padding: 0.6rem 0.8rem; border-radius: 4px; font-family: inherit; font-size: 0.9rem;
+  }
+  button {
+    background: var(--clay); color: #1a1510; border: none; padding: 0.6rem 1.2rem;
+    border-radius: 4px; font-family: inherit; font-weight: 600; cursor: pointer;
+  }
+  button:disabled { opacity: 0.5; cursor: default; }
+  .summary { display: flex; gap: 1.5rem; margin-bottom: 1.5rem; }
+  .count { background: var(--panel); border: 1px solid #332c22; border-radius: 6px; padding: 0.8rem 1.2rem; }
+  .count .n { font-size: 1.6rem; font-weight: 700; }
+  .count .l { font-size: 0.75rem; color: var(--dim); text-transform: uppercase; letter-spacing: 0.05em; }
+  .log { background: var(--panel); border: 1px solid #332c22; border-radius: 6px; padding: 1rem; }
+  .step { padding: 0.55rem 0; border-bottom: 1px solid #2a241b; font-size: 0.85rem; }
+  .step:last-child { border-bottom: none; }
+  .tag { display: inline-block; padding: 0.1rem 0.5rem; border-radius: 3px; font-size: 0.7rem; margin-right: 0.6rem; text-transform: uppercase; letter-spacing: 0.03em; }
+  .tag.scan { background: #2a3d2a; color: var(--ok); }
+  .tag.fix_applied { background: #3a2f1c; color: var(--clay); }
+  .tag.retry { background: #3d321a; color: var(--warn); }
+  .tag.flagged_for_review { background: #402424; color: #d97a7a; }
+  .tag.fix_failed, .tag.fix_error { background: #402424; color: #d97a7a; }
+  .tag.skip { background: #2a2a2a; color: var(--dim); }
+  .reasoning { color: var(--dim); margin-top: 0.25rem; padding-left: 3.2rem; font-style: italic; }
+  .selector { color: #b5a88f; }
+</style>
+</head>
+<body>
+
+<h1>Accessibility Self-Auditing Agent</h1>
+<p class="sub">Runs a scan → fix → re-scan → retry cycle against the demo site and shows every real step taken.</p>
+
+<div class="controls">
+  <input type="text" id="url" value="http://localhost:8080/index.html">
+  <button id="run">Run Audit</button>
+</div>
+
+<div class="summary" id="summary" style="display:none">
+  <div class="count"><div class="n" id="beforeCount">–</div><div class="l">violations before</div></div>
+  <div class="count"><div class="n" id="afterCount">–</div><div class="l">violations after</div></div>
+</div>
+
+<div class="log" id="log"><div class="step" style="color:var(--dim)">No run yet.</div></div>
+
+<script>
+const BACKEND = "http://localhost:8000";
+
+document.getElementById("run").addEventListener("click", async () => {
+  const btn = document.getElementById("run");
+  const logEl = document.getElementById("log");
+  btn.disabled = true;
+  btn.textContent = "Running…";
+  logEl.innerHTML = '<div class="step" style="color:var(--dim)">Scanning…</div>';
+
+  try {
+    const res = await fetch(`${BACKEND}/audit`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ url: document.getElementById("url").value }),
+    });
+    const data = await res.json();
+    renderSteps(data.steps);
+    document.getElementById("summary").style.display = "flex";
+    document.getElementById("beforeCount").textContent = data.before.length;
+    document.getElementById("afterCount").textContent = data.after.length;
+  } catch (e) {
+    logEl.innerHTML = `<div class="step" style="color:#d97a7a">Run failed: ${e.message}. Is the backend running on :8000?</div>`;
+  } finally {
+    btn.disabled = false;
+    btn.textContent = "Run Audit";
+  }
+});
+
+function renderSteps(steps) {
+  const logEl = document.getElementById("log");
+  logEl.innerHTML = "";
+  for (const s of steps) {
+    const div = document.createElement("div");
+    div.className = "step";
+    let line = `<span class="tag ${s.type}">${s.type.replace(/_/g, " ")}</span>`;
+    if (s.selector) line += `<span class="selector">${s.selector}</span> `;
+    if (s.rule) line += `[${s.rule}] `;
+    if (s.violation_count !== undefined) line += `${s.violation_count} violation(s)`;
+    if (s.from_hex && s.to_hex) line += `${s.from_hex} → ${s.to_hex} (ratio ${s.original_ratio} → ${s.new_ratio})`;
+    if (s.value) line += `→ "${s.value}"`;
+    if (s.attempt) line += ` (attempt ${s.attempt})`;
+    if (s.reason) line += ` — ${s.reason}`;
+    if (s.error) line += ` — ${s.error}`;
+    div.innerHTML = line;
+    if (s.reasoning) {
+      const r = document.createElement("div");
+      r.className = "reasoning";
+      r.textContent = `"${s.reasoning}"`;
+      div.appendChild(r);
+    }
+    logEl.appendChild(div);
+  }
+}
+</script>
+
+</body>
+</html>

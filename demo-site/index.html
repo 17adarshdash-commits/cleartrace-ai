@@ -1,0 +1,59 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Kavya's Pottery Studio &mdash; Workshops</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<header class="site-header">
+  <h1>Kavya's Pottery Studio</h1>
+  <p class="tagline">Hand-thrown ceramics &amp; weekend workshops in Indiranagar</p>
+</header>
+
+<main>
+
+  <section class="section">
+    <h2>How a Workshop Day Works</h2>
+    <!-- VIOLATION 1: Context Test — informative infographic with no alt text -->
+    <img src="workshop-flow.svg" width="600" height="220">
+    <p>Every session runs the same four stages, from check-in to the final glaze pickup two weeks later.</p>
+  </section>
+
+  <section class="section">
+    <h2>Reserve Your Seat</h2>
+    <p>Seats are limited to eight people per session so everyone gets real time on the wheel.</p>
+    <!-- VIOLATION 2: Contrast Trap — inline style, #777 on #FFF fails WCAG AA.
+         Kept inline (not in style.css) deliberately: the patcher only safely
+         reaches inline styles without a CSS parser — see backend/patcher.py. -->
+    <button class="cta-button" style="color: #777777;">Reserve a Seat</button>
+  </section>
+
+  <section class="section">
+    <h2>Tell Us About Yourself</h2>
+    <p class="form-intro">We use this to match you with a session that fits your schedule and experience level.</p>
+    <form>
+      <!-- VIOLATION 3: Form Flaw — stripped name/id, no label, no aria-label.
+           Deducible only from the preceding <p> context above and each field's own hint text. -->
+      <p class="field-hint">Full name, as you'd like it on your seat card</p>
+      <input type="text" id="field-1">
+
+      <p class="field-hint">Best contact number for a same-day workshop reminder</p>
+      <input type="tel" id="field-2">
+
+      <p class="field-hint">Have you thrown on a wheel before? Tell us in a word or two</p>
+      <input type="text" id="field-3">
+
+      <button type="submit" class="cta-button submit-button">Send Request</button>
+    </form>
+  </section>
+
+</main>
+
+<footer class="site-footer">
+  <p>Kavya's Pottery Studio &middot; 4th Cross, Indiranagar, Bengaluru</p>
+</footer>
+
+</body>
+</html>
