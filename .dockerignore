@@ -1,0 +1,7 @@
+backend/venv/
+backend/__pycache__/
+backend/.env
+demo-site-working/
+demo-site-2-working/
+demo-site-visual-working/
+.git/

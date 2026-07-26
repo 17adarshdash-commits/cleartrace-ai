@@ -30,6 +30,7 @@ from pathlib import Path
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import Response
+from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 import httpx
 
@@ -50,24 +51,53 @@ DEMO_SITE_DIR = Path(__file__).parent.parent / "demo-site"
 WORKING_COPY = Path(__file__).parent.parent / "demo-site-working"
 
 # Maps a port in the requested URL to the (source, working-copy) directory pair
-# to patch. Add an entry here for every demo site you stand up on a new port —
-# this is what was missing when a second site got added without updating this file.
+# to patch. Used for local dev, where each demo site runs on its own port
+# (python -m http.server on 8080/8081/8082). Add an entry here for every new
+# local demo site you stand up.
 SITE_DIRS_BY_PORT = {
     "8080": (Path(__file__).parent.parent / "demo-site", Path(__file__).parent.parent / "demo-site-working"),
     "8081": (Path(__file__).parent.parent / "demo-site-2", Path(__file__).parent.parent / "demo-site-2-working"),
     "8082": (Path(__file__).parent.parent / "demo-site-visual", Path(__file__).parent.parent / "demo-site-visual-working"),
 }
 
+# In production there's one host and one port, so sites are distinguished by
+# path instead: https://<render-url>/sites/site1/index.html etc. The backend
+# also serves these paths directly (see the StaticFiles mounts below), which
+# is what makes patching actually visible — the backend writes to the same
+# files it serves, unlike a separate static host it can't reach into.
+SITE_DIRS_BY_PATH = {
+    "/sites/site1": (Path(__file__).parent.parent / "demo-site", Path(__file__).parent.parent / "demo-site-working"),
+    "/sites/site2": (Path(__file__).parent.parent / "demo-site-2", Path(__file__).parent.parent / "demo-site-2-working"),
+    "/sites/visual": (Path(__file__).parent.parent / "demo-site-visual", Path(__file__).parent.parent / "demo-site-visual-working"),
+}
+
 
 def _dirs_for_url(url: str):
     from urllib.parse import urlparse
-    port = str(urlparse(url).port or "8080")
-    if port not in SITE_DIRS_BY_PORT:
-        raise ValueError(
-            f"No demo site directory configured for port {port}. "
-            f"Add an entry to SITE_DIRS_BY_PORT in main.py."
-        )
-    return SITE_DIRS_BY_PORT[port]
+    parsed = urlparse(url)
+
+    for path_prefix, dirs in SITE_DIRS_BY_PATH.items():
+        if parsed.path.startswith(path_prefix):
+            return dirs
+
+    port = str(parsed.port or "8080")
+    if port in SITE_DIRS_BY_PORT:
+        return SITE_DIRS_BY_PORT[port]
+
+    raise ValueError(
+        f"No demo site directory configured for URL {url}. "
+        f"Add an entry to SITE_DIRS_BY_PORT or SITE_DIRS_BY_PATH in main.py."
+    )
+
+
+# Serve each site's WORKING copy (the one that actually gets patched) at its
+# production path, so auditing https://<host>/sites/site1/index.html and
+# then re-fetching that same URL shows the real, current patched state.
+for _path_prefix, (_source, _working) in SITE_DIRS_BY_PATH.items():
+    _working.mkdir(parents=True, exist_ok=True)
+    if not any(_working.iterdir()):
+        shutil.copytree(_source, _working, dirs_exist_ok=True)
+    app.mount(_path_prefix, StaticFiles(directory=str(_working), html=True), name=_path_prefix.strip("/"))
 
 
 class AuditRequest(BaseModel):
