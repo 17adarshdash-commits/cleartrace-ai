@@ -6,6 +6,8 @@ Scans a page with axe-core, fixes what it can, re-scans to verify the
 fix actually worked, and retries (capped at 3 attempts) on judgment-call
 violations before flagging for human review.
 
+Project Description: https://docs.google.com/document/d/1KCDtLeklnKNk2-JGJO9Xu7I8QXBl5YOF/edit
+
 ## What's real vs. what's a stub right now
 
 - **Auditor (axe-core + Playwright)** — fully working, no stub.
