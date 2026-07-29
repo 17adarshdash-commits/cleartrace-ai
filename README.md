@@ -6,7 +6,7 @@ Scans a page with axe-core, fixes what it can, re-scans to verify the
 fix actually worked, and retries (capped at 3 attempts) on judgment-call
 violations before flagging for human review.
 
-Project Description: https://docs.google.com/document/d/1KCDtLeklnKNk2-JGJO9Xu7I8QXBl5YOF/edit
+Project PPT: https://docs.google.com/presentation/d/1lsrTMoFYM0CmlYYZKM2s2MMtoY8jLutV/edit?slide=id.p1#slide=id.p1
 
 ## What's real vs. what's a stub right now
 
